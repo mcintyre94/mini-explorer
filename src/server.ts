@@ -121,13 +121,13 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
   res.write(accountSkeleton(addr, v, route));
   const alive = () => !res.writableEnded && !res.destroyed;
 
+  // Recent transactions for EVERY account type — getSignaturesForAddress works
+  // on any address (kicked off in parallel with route-specific enrichment).
+  const sigsP = getSignaturesForAddress(addr, 10).catch(() => []);
+
   // Which enrichment patches fire depends on what wave 1 found.
   if (route === 'wallet') {
-    // holdings + history are two parallel requests; both return (slowed) together.
-    const [holdings, sigs] = await slowly(slow, () =>
-      Promise.all([getHoldings(addr), getSignaturesForAddress(addr, 10)]),
-    );
-    if (alive()) res.write('\n' + historyPatch(sigs ?? [])); // history streams first
+    const holdings = await slowly(slow, () => getHoldings(addr));
     // Only non-zero holdings are displayed, so only resolve those mints.
     const rows = (holdings ? holdingRows(holdings) : []).filter((r) => r.uiAmount > 0);
     const nativeSol = v.lamports / 1e9;
@@ -137,18 +137,15 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
     if (alive()) res.write('\n' + solUsdPatch(nativeSol, info.get(SOL_MINT)));
     if (alive()) res.write('\n' + usdTotalPatch(nativeSol, rows, info));
   } else if (route === 'mint') {
-    const [info, sigs] = await Promise.all([
-      slowly(slow, () => searchTokens([addr], { bypass })),
-      getSignaturesForAddress(addr, 10).catch(() => []),
-    ]);
+    const info = await slowly(slow, () => searchTokens([addr], { bypass }));
     if (alive()) res.write('\n' + mintMetaPatch(addr, info.get(addr)));
-    if (alive()) res.write('\n' + historyPatch(sigs ?? []));
   } else if (route === 'token-account') {
     const mint = String((!Array.isArray(v.data) && v.data.parsed?.info?.mint) || '');
     const info = await slowly(slow, () => searchTokens(mint ? [mint] : [], { bypass }));
     if (alive()) res.write('\n' + taTokenPatch(mint, info.get(mint)));
   }
-  // program / other: nothing async in MVP.
+
+  if (alive()) res.write('\n' + historyPatch(await sigsP));
   res.end();
 }
 

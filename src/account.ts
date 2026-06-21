@@ -73,9 +73,7 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
   if (route === 'wallet') {
     body = html`
     <h3>Token holdings</h3>
-    <ul class="holdings">${range('holdings', 'loading holdings…')}</ul>
-    <h3>Recent transactions</h3>
-    <ul class="history">${range('history', 'loading history…')}</ul>`;
+    <ul class="holdings">${range('holdings', 'loading holdings…')}</ul>`;
   } else if (route === 'mint') {
     const supply = Number(info.supply ?? 0) / 10 ** Number(info.decimals ?? 0);
     body = html`
@@ -86,9 +84,7 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
       <div><dt>Freeze authority</dt><dd class="mono">${info.freezeAuthority ? addrLink(String(info.freezeAuthority)) : none}</dd></div>
     </dl>
     <h3>Market &amp; metadata <span class="muted">(Jupiter)</span></h3>
-    <div class="mint-meta">${range('mint-meta', 'resolving market data…')}</div>
-    <h3>Recent transactions <span class="muted">(referencing this mint — not all transfers)</span></h3>
-    <ul class="history">${range('history', 'loading…')}</ul>`;
+    <div class="mint-meta">${range('mint-meta', 'resolving market data…')}</div>`;
   } else if (route === 'token-account') {
     const amt = (info.tokenAmount ?? {}) as Record<string, unknown>;
     body = html`
@@ -105,8 +101,7 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
     <dl class="meta">
       <div><dt>Label</dt><dd>${programLabel(addr) ?? 'Unknown program'}</dd></div>
       <div><dt>Program data</dt><dd class="mono">${info.programData ? addrLink(String(info.programData)) : '—'}</dd></div>
-    </dl>
-    <p class="muted">Executable program. IDL/metadata discovery is post-MVP.</p>`;
+    </dl>`;
   } else if (route === 'program-data') {
     body = html`
     <dl class="meta">
@@ -118,7 +113,16 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
     body = html`<p class="muted">Unrecognized account layout — owner ${addrLink(v.owner)}, ${dataSize(v).toLocaleString()} bytes of data. Best-effort raw view.</p>`;
   }
 
-  return toHtml(html`<section class="account">${head}${base}${body}</section>`);
+  // Recent transactions — universal (getSignaturesForAddress works on any
+  // address). The note is route-aware where the result needs a caveat.
+  const note = route === 'mint' ? html`<span class="muted">(referencing this mint — not all transfers)</span>`
+    : route === 'program' ? html`<span class="muted">(recent invocations)</span>`
+    : '';
+  const history = html`
+  <h3>Recent transactions ${note}</h3>
+  <ul class="history">${range('history', 'loading…')}</ul>`;
+
+  return toHtml(html`<section class="account">${head}${base}${body}${history}</section>`);
 }
 
 // Account doesn't currently exist (never created, or closed) — but it may still
