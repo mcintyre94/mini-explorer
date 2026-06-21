@@ -92,7 +92,12 @@ dl.meta dd { margin: 2px 0 0; font-family: var(--mono); font-size: 13px; }
 h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 28px 0 10px; }
 
 .balances .bal { width: 100%; border-collapse: collapse; }
-.balances td { padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 13px; }
+.balances td { padding: 5px 14px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 13px; vertical-align: middle; }
+/* account fills the left; change + asset hug content on the right (justified). */
+.balances td:first-child { padding-left: 0; width: 100%; }
+.balances .bal-amt { text-align: right; white-space: nowrap; }
+.balances .bal-asset { white-space: nowrap; padding-right: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.balances .bal-group td { border: 0; padding: 14px 0 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .usd { color: var(--muted); font-size: 12px; }
@@ -118,7 +123,6 @@ ul.accounts li { display: flex; align-items: center; gap: 6px; background: var(-
 .b.write { color: #d9b441; border-color: #5a4d12; }
 .b.alt { color: var(--accent-2); border-color: #3d2a5a; }
 
-.bal caption { text-align: left; color: var(--muted); font-size: 12px; padding: 8px 0 4px; caption-side: top; }
 .badge.fail { background: #2a0f0f; border-color: #5a1d1d; color: var(--neg); }
 
 /* Pin to sans so the symbol + verified ✓ render identically whether the cell

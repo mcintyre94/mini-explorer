@@ -320,13 +320,19 @@ export function balancesPatch(tx: TransactionResult, refs: TokenCellRef[]): stri
   const m = tx.transaction.message;
   const meta = tx.meta;
 
-  const solRows: Html[] = [];
+  // One table with SOL/Tokens group sub-headers — keeps the two sections visually
+  // separate while sharing aligned columns (account | amount | asset). The asset
+  // cell is empty under the SOL header (the header is the label).
+  const sol: Html[] = [];
   for (let i = 0; i < meta.preBalances.length; i++) {
     const d = (meta.postBalances[i] ?? 0n) - (meta.preBalances[i] ?? 0n);
     if (d === 0n) continue;
     const key = m.accountKeys[i]?.pubkey ?? `#${i}`;
-    solRows.push(html`<tr><td class="mono">${maybeAddr(key)}</td>
-      <td class="${d < 0n ? 'neg' : 'pos'}">${d > 0n ? '+' : ''}${lamportsToSol(d)} SOL</td></tr>`);
+    sol.push(html`<tr>
+      <td class="mono">${maybeAddr(key)}</td>
+      <td class="bal-amt ${d < 0n ? 'neg' : 'pos'}">${d > 0n ? '+' : ''}${lamportsToSol(d)}</td>
+      <td></td>
+    </tr>`);
   }
 
   // Owner lookup, parallel to refs (tokenChanges walks pre then post balances).
@@ -338,21 +344,20 @@ export function balancesPatch(tx: TransactionResult, refs: TokenCellRef[]): stri
     }
     return '—';
   };
-  const tokRows = refs.map((r) => {
+  const tok = refs.map((r) => {
     const owner = ownerFor(r.mint);
     const d = r.uiDelta ?? 0;
     return html`<tr>
       <td class="mono">${maybeAddr(owner)}</td>
-      <td class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : ''}${humanAmount(d)}</td>
-      <td class="tok-cell">${range(r.name, 'resolving…')}</td>
+      <td class="bal-amt ${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : ''}${humanAmount(d)}</td>
+      <td class="bal-asset tok-cell">${range(r.name, 'resolving…')}</td>
     </tr>`;
   });
 
-  const solTable = solRows.length ? html`<table class="bal"><caption>SOL</caption>${solRows}</table>` : '';
-  const tokTable = tokRows.length ? html`<table class="bal"><caption>Tokens</caption>${tokRows}</table>` : '';
-  const inner = solRows.length || tokRows.length
-    ? html`${solTable}${tokTable}`
-    : html`<p class="muted">No balance changes.</p>`;
+  const groups: Html[] = [];
+  if (sol.length) groups.push(html`<tr class="bal-group"><td colspan="3">SOL</td></tr>`, ...sol);
+  if (tok.length) groups.push(html`<tr class="bal-group"><td colspan="3">Tokens</td></tr>`, ...tok);
+  const inner = groups.length ? html`<table class="bal">${groups}</table>` : html`<p class="muted">No balance changes.</p>`;
   return toHtml(patch('balances', inner));
 }
 
