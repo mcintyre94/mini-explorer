@@ -1,0 +1,15 @@
+{
+  "name": "solana-stream-explorer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Streaming Solana explorer demoing Chrome declarative partial updates (out-of-order HTML streaming).",
+  "scripts": {
+    "dev": "DEV_TOOLS=1 node --env-file=.env --watch src/server.ts",
+    "start": "node --env-file=.env src/server.ts"
+  },
+  "dependencies": {
+    "@solana-program/compute-budget": "^0.16.0",
+    "@solana/kit": "^6.10.0"
+  }
+}

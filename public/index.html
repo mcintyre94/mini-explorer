@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solana Stream Explorer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">◎ Solana Stream Explorer</a>
+    <form id="nav">
+      <input id="q" name="q" autocomplete="off" spellcheck="false"
+             placeholder="Transaction signature or account address…">
+      <button type="submit">Go</button>
+    </form>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <!-- Skeleton + out-of-order patches stream in here. The client is a single pipe. -->
+  <main id="page-root"></main>
+
+  <script type="module" src="/client.js"></script>
+</body>
+</html>
