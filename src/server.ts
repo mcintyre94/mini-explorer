@@ -127,7 +127,8 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
       Promise.all([getHoldings(addr), getSignaturesForAddress(addr, 10)]),
     );
     if (alive()) res.write('\n' + historyPatch(sigs ?? [])); // history streams first
-    const rows = holdings ? holdingRows(holdings) : [];
+    // Only non-zero holdings are displayed, so only resolve those mints.
+    const rows = (holdings ? holdingRows(holdings) : []).filter((r) => r.uiAmount > 0);
     const nativeSol = v.lamports / 1e9;
     // Holdings render AFTER the search so they can be sorted by USD value.
     const info = await slowly(slow, () => searchTokens([SOL_MINT, ...rows.map((r) => r.mint)], { bypass }));

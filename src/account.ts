@@ -166,7 +166,11 @@ export function holdingsPatch(rows: HoldingRow[], info: Map<string, TokenInfo>, 
       const tok = info.get(r.mint);
       return { row: r, tok, value: r.uiAmount * (tok?.usdPrice ?? 0) };
     })
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => {
+      // All Jupiter-indexed tokens first (by USD value), then unindexed together.
+      if (!!a.tok !== !!b.tok) return a.tok ? -1 : 1;
+      return b.value - a.value;
+    });
 
   if (!enriched.length) return toHtml(patch('holdings', html`<li class="muted">No token holdings.</li>`));
 

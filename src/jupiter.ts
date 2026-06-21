@@ -47,19 +47,25 @@ export async function searchTokens(
   }
   if (!missing.length) return out; // fully warm — no round-trip
 
-  try {
-    const res = await fetch(`${BASE}/tokens/v2/search?query=${missing.slice(0, 100).join(',')}`, {
-      headers: { 'x-api-key': KEY ?? '' },
-    });
-    if (!res.ok) return out; // degrade: misses fall to unindexed state
-    const arr = (await res.json()) as TokenInfo[];
-    for (const t of arr) {
-      if (!t?.id) continue;
-      out.set(t.id, t);
-      tokenCache.set(t.id, { info: t, exp: now + TTL_MS }); // warm for next time
+  // Jupiter caps the query at 100 mints, so fetch in sequential batches of 100
+  // (sequential to stay friendly to the rate limit). Dropping the overflow is
+  // what made mints past #100 on a dusty wallet show as "unindexed".
+  for (let i = 0; i < missing.length; i += 100) {
+    const batch = missing.slice(i, i + 100);
+    try {
+      const res = await fetch(`${BASE}/tokens/v2/search?query=${batch.join(',')}`, {
+        headers: { 'x-api-key': KEY ?? '' },
+      });
+      if (!res.ok) continue; // skip this batch; others can still resolve
+      const arr = (await res.json()) as TokenInfo[];
+      for (const t of arr) {
+        if (!t?.id) continue;
+        out.set(t.id, t);
+        tokenCache.set(t.id, { info: t, exp: now + TTL_MS }); // warm for next time
+      }
+    } catch {
+      // network failure on this batch → its mints fall to unindexed
     }
-  } catch {
-    // network failure → misses stay absent → those cells render unindexed
   }
   return out;
 }
