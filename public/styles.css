@@ -60,8 +60,6 @@ main { max-width: 880px; margin: 0 auto; padding: 24px 20px 80px; }
 }
 .banner code { background: #00000040; padding: 1px 5px; border-radius: 4px; }
 
-.home-hero { margin-bottom: 22px; }
-.home-hero h2 { margin: 0 0 6px; }
 .trending { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
 .trending .search-empty { padding: 14px; }
 /* Header + rows share one fixed column template, so columns align across rows. */

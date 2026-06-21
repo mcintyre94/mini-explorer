@@ -109,7 +109,7 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
     </dl>
     <p class="muted">Holds the deployed bytecode for an upgradeable program.</p>`;
   } else {
-    body = html`<p class="muted">Unrecognized account layout — owner ${addrLink(v.owner)}, ${dataSize(v).toLocaleString()} bytes of data. Best-effort raw view.</p>`;
+    body = html`<p class="muted">Unrecognized account layout — owner ${addrLink(v.owner)}, ${dataSize(v).toLocaleString()} bytes of data.</p>`;
   }
 
   // Recent transactions — universal (getSignaturesForAddress works on any

@@ -32,10 +32,9 @@ if (!Element.prototype.streamAppendHTMLUnsafe) {
 function showFlagBanner() {
   banner.hidden = false;
   banner.innerHTML = `
-    <strong>Declarative partial updates not available.</strong>
-    This demo needs <em>Chrome 148+</em> with
-    <code>chrome://flags/#enable-experimental-web-platform-features</code> enabled,
-    then a restart. (<code>Element.prototype.streamAppendHTMLUnsafe</code> is missing.)`;
+    <strong>This browser isn't supported yet.</strong>
+    Mini Explorer needs <em>Chrome 148+</em> with experimental web platform features enabled —
+    turn on <code>chrome://flags/#enable-experimental-web-platform-features</code> and restart Chrome.`;
 }
 
 // Typeahead search: same streaming model, just piped into a dropdown instead of
