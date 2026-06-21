@@ -52,7 +52,16 @@ body {
   background: var(--accent); color: #04130c; font-weight: 600;
 }
 
-main { max-width: 880px; margin: 0 auto; padding: 24px 20px 80px; }
+main { max-width: 880px; margin: 0 auto; padding: 24px 20px 40px; }
+
+.sitefoot {
+  max-width: 880px; margin: 0 auto; padding: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 13px;
+}
+.sitefoot a { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; }
+.sitefoot a:hover { color: var(--accent); }
+.sitefoot svg { width: 16px; height: 16px; fill: currentColor; }
 
 .banner {
   max-width: 880px; margin: 16px auto; padding: 14px 18px;
