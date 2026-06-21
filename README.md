@@ -34,9 +34,10 @@ resolves.
   streaming).
 - **Node 24+** — runs TypeScript directly via type-stripping, no build step.
 - A `.env` (see `.env.copy`) with `RPC_URL` (Solana JSON-RPC) and
-  `JUPITER_API_KEY`. A [Triton](https://triton.one) RPC unlocks richer history
-  (full transactions + token-transfer detection in one call); other RPCs fall
-  back to signatures-only.
+  `JUPITER_API_KEY`. Account history uses an extended `getTransactionsForAddress`
+  RPC method (full transactions + token-transfer detection in one call) where the
+  provider supports it (e.g. Helius), and falls back to the standard
+  `getSignaturesForAddress` (signatures only) otherwise.
 
 ## Run
 
@@ -99,7 +100,7 @@ token cache for a cold load) are **inert unless `DEV_TOOLS=1`** — set by
 |---|---|
 | `src/server.ts` | HTTP server, routing, per-request stream orchestration |
 | `src/html.ts` | `html` tagged template (escape-by-default) + marker/range/patch helpers |
-| `src/rpc.ts` | RPC client (`@solana/kit`) + Triton `getTransactionsForAddress` (with fallback) |
+| `src/rpc.ts` | RPC client (`@solana/kit`) + extended `getTransactionsForAddress` (with fallback) |
 | `src/jupiter.ts` | Jupiter client (token search, holdings, trending) + token cache |
 | `src/decode.ts` | Native instruction decode (`@solana-program/compute-budget`) + priority fee |
 | `src/programs.ts` | Curated programId → label dictionary + native set |

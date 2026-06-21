@@ -4,7 +4,8 @@ const RPC_URL = process.env.RPC_URL;
 if (!RPC_URL) throw new Error('RPC_URL is not set (expected in .env)');
 
 // kit's RPC client (a proxy). u64/i64 fields come back as `bigint`. We add the
-// type for Triton's custom getTransactionsForAddress — the proxy dispatches any
+// type for the extended getTransactionsForAddress method (not standard Solana
+// RPC; supported by some providers, e.g. Helius) — the proxy dispatches any
 // method name at runtime, so only the type is needed. Responses are cast to our
 // own loose shapes (kit's jsonParsed unions are gnarly; we access defensively).
 type GtfaConfig = {
@@ -14,12 +15,12 @@ type GtfaConfig = {
   limit?: number;
   filters?: { tokenAccounts?: 'none' | 'balanceChanged' | 'all' };
 };
-type WithTriton = {
+type WithExtendedRpc = {
   getTransactionsForAddress(address: string, config: GtfaConfig): { send(): Promise<{ data?: GtfaEntry[] }> };
 };
 
 const base = createSolanaRpc(RPC_URL);
-const rpc = base as typeof base & WithTriton;
+const rpc = base as typeof base & WithExtendedRpc;
 
 // ---- Shapes we read (defensive: treat as intent, access fields carefully) ----
 export type ParsedInstruction = {
@@ -110,10 +111,10 @@ type GtfaEntry = {
   transaction: { signatures: string[]; message: { instructions: HistoryIx[] } };
 };
 
-// Triton's getTransactionsForAddress returns FULL txs in one call (so we can
+// The extended getTransactionsForAddress returns FULL txs in one call (so we can
 // summarize each), and `tokenAccounts: balanceChanged` also surfaces a wallet's
-// token transfers (which don't name the wallet pubkey). Falls back to the
-// standard getSignaturesForAddress (signatures only) on any non-Triton RPC.
+// token transfers (which don't name the wallet pubkey). Not standard Solana RPC,
+// so it falls back to getSignaturesForAddress (signatures only) where unsupported.
 export async function getAccountTransactions(addr: string, limit = 10): Promise<HistoryEntry[]> {
   try {
     const r = await rpc.getTransactionsForAddress(addr, {
