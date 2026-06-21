@@ -241,6 +241,6 @@ async function handle(req: http.IncomingMessage, res: ServerResponse) {
 }
 
 server.listen(PORT, () => {
-  console.log(`Solana Stream Explorer (MVP: tx + account, real data) → http://localhost:${PORT}`);
+  console.log(`Mini Explorer (MVP: tx + account, real data) → http://localhost:${PORT}`);
   console.log(`  dev tools (?slow, ?nocache): ${DEV_TOOLS ? 'ENABLED' : 'disabled (set DEV_TOOLS=1 to enable)'}`);
 });

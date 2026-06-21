@@ -1,4 +1,4 @@
-# Solana Stream Explorer
+# Mini Explorer
 
 A Solana block explorer (transaction + account pages) that demos Chrome's
 **declarative partial updates** — out-of-order HTML streaming. Each page renders

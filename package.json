@@ -1,9 +1,9 @@
 {
-  "name": "solana-stream-explorer",
+  "name": "mini-explorer",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Streaming Solana explorer demoing Chrome declarative partial updates (out-of-order HTML streaming).",
+  "description": "Mini Solana explorer demoing Chrome declarative partial updates (out-of-order HTML streaming).",
   "scripts": {
     "dev": "DEV_TOOLS=1 node --env-file=.env --watch src/server.ts",
     "start": "node --env-file=.env src/server.ts"
