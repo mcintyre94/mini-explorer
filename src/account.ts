@@ -1,13 +1,12 @@
-import type { AccountValue, SignatureInfo } from './rpc.ts';
+import type { AccountValue, HistoryEntry } from './rpc.ts';
 import type { TokenInfo, Holdings } from './jupiter.ts';
-import { short, tokenCell, unindexedCell, addrLink, copyBtn } from './render.ts';
+import { short, tokenCell, unindexedCell, addrLink, copyBtn, lamportsToSol, humanAmount } from './render.ts';
 import { html, toHtml, raw, range, patch, type Html } from './html.ts';
 import { programLabel } from './programs.ts';
 
 const SYSTEM = '11111111111111111111111111111111';
 export const SOL_MINT = 'So11111111111111111111111111111111111111112';
 
-const sol = (lamports: number) => (lamports / 1e9).toLocaleString('en-US', { maximumFractionDigits: 9 });
 const usd = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export type Route = 'wallet' | 'mint' | 'token-account' | 'program' | 'program-data' | 'other';
@@ -54,8 +53,8 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
   // For a wallet, lamports IS the SOL balance (show USD); for other accounts it's
   // rent-holding lamports, so keep the literal "Lamports" label and no USD.
   const solField = route === 'wallet'
-    ? html`<div><dt>SOL balance</dt><dd class="mono">${sol(v.lamports)} SOL <span class="usd">${range('sol-usd', '…')}</span></dd></div>`
-    : html`<div><dt>Lamports</dt><dd class="mono">${sol(v.lamports)} SOL</dd></div>`;
+    ? html`<div><dt>SOL balance</dt><dd class="mono">${lamportsToSol(v.lamports)} SOL <span class="usd">${range('sol-usd', '…')}</span></dd></div>`
+    : html`<div><dt>Lamports</dt><dd class="mono">${lamportsToSol(v.lamports)} SOL</dd></div>`;
   const portfolio = route === 'wallet'
     ? html`<div><dt>Portfolio (USD)</dt><dd class="mono">${range('usd-total', 'summing…')}</dd></div>`
     : '';
@@ -75,11 +74,11 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
     <h3>Token holdings</h3>
     <ul class="holdings">${range('holdings', 'loading holdings…')}</ul>`;
   } else if (route === 'mint') {
-    const supply = Number(info.supply ?? 0) / 10 ** Number(info.decimals ?? 0);
+    const supply = humanAmount(Number(info.supply ?? 0) / 10 ** Number(info.decimals ?? 0));
     body = html`
     <dl class="meta">
       <div><dt>Decimals</dt><dd class="mono">${String(info.decimals ?? '—')}</dd></div>
-      <div><dt>On-chain supply</dt><dd class="mono">${supply.toLocaleString('en-US')}</dd></div>
+      <div><dt>On-chain supply</dt><dd class="mono">${supply}</dd></div>
       <div><dt>Mint authority</dt><dd class="mono">${info.mintAuthority ? addrLink(String(info.mintAuthority)) : none}</dd></div>
       <div><dt>Freeze authority</dt><dd class="mono">${info.freezeAuthority ? addrLink(String(info.freezeAuthority)) : none}</dd></div>
     </dl>
@@ -187,7 +186,7 @@ export function holdingsPatch(rows: HoldingRow[], info: Map<string, TokenInfo>, 
       row.token2022 ? html`<span class="b alt">Token-2022</span>` : '',
     ];
     return html`<li>
-      <span class="amount">${row.uiAmount.toLocaleString('en-US', { maximumFractionDigits: 6 })}</span>
+      <span class="amount">${humanAmount(row.uiAmount)}</span>
       <span class="hold-tok">${tok ? tokenCell(tok, row.uiAmount) : unindexedCell(row.mint)}</span>
       ${badges}
     </li>`;
@@ -214,15 +213,34 @@ export function usdTotalPatch(nativeSol: number, rows: HoldingRow[], info: Map<s
   return toHtml(patch('usd-total', html`${usd(total)}`));
 }
 
-export function historyPatch(sigs: SignatureInfo[]): string {
-  if (!sigs.length) return toHtml(patch('history', html`<li class="muted">No recent transactions.</li>`));
-  const items = sigs.map((s) => {
-    const when = s.blockTime ? new Date(s.blockTime * 1000).toISOString().slice(0, 19).replace('T', ' ') : '—';
-    const status = s.err ? html`<span class="b" style="color:#ff6b6b">failed</span>` : '';
+// Compact "what did this tx do" — distinct program:action descriptors from the
+// top-level instructions (ComputeBudget boilerplate dropped), capped.
+const COMPUTE_BUDGET = 'ComputeBudget111111111111111111111111111111';
+function txSummary(ixs: HistoryEntry['instructions']): Html | '' {
+  const parts = ixs
+    .filter((ix) => ix.programId !== COMPUTE_BUDGET)
+    .map((ix) => {
+      const label = programLabel(ix.programId) ?? short(ix.programId);
+      return ix.parsed?.type ? `${label}: ${ix.parsed.type}` : label;
+    });
+  const uniq = [...new Set(parts)];
+  if (!uniq.length) return '';
+  const shown = uniq.slice(0, 3).join(' · ');
+  const extra = uniq.length - 3;
+  return html`<div class="hist-sum muted">${shown}${extra > 0 ? ` · +${extra}` : ''}</div>`;
+}
+
+export function historyPatch(entries: HistoryEntry[]): string {
+  if (!entries.length) return toHtml(patch('history', html`<li class="muted">No recent transactions.</li>`));
+  const items = entries.map((e) => {
+    const when = e.blockTime ? new Date(e.blockTime * 1000).toISOString().slice(0, 19).replace('T', ' ') : '—';
+    const status = e.err ? html`<span class="b" style="color:#ff6b6b">failed</span>` : '';
     return html`<li>
-      <span class="addr-wrap"><a class="mono addr" href="/tx/${s.signature}" title="${s.signature}">${short(s.signature)}</a>${copyBtn(s.signature)}</span>
-      <span class="muted">slot ${s.slot.toLocaleString()}</span>
-      <span class="muted">${when}</span> ${status}
+      <div class="hist-top">
+        <span class="addr-wrap"><a class="mono addr" href="/tx/${e.signature}" title="${e.signature}">${short(e.signature)}</a>${copyBtn(e.signature)}</span>
+        <span class="muted">${when}</span> ${status}
+      </div>
+      ${txSummary(e.instructions)}
     </li>`;
   });
   return toHtml(patch('history', html`${items}`));

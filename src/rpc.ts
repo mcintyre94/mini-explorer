@@ -1,19 +1,25 @@
-// Thin JSON-RPC client. Keys stay server-side (read from .env).
+import { createSolanaRpc, type Address, type Signature } from '@solana/kit';
+
 const RPC_URL = process.env.RPC_URL;
 if (!RPC_URL) throw new Error('RPC_URL is not set (expected in .env)');
 
-let id = 0;
-export async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(RPC_URL!, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }),
-  });
-  if (!res.ok) throw new Error(`RPC ${method} HTTP ${res.status}`);
-  const json = (await res.json()) as { result?: T; error?: { message: string } };
-  if (json.error) throw new Error(`RPC ${method}: ${json.error.message}`);
-  return json.result as T;
-}
+// kit's RPC client (a proxy). u64/i64 fields come back as `bigint`. We add the
+// type for Triton's custom getTransactionsForAddress — the proxy dispatches any
+// method name at runtime, so only the type is needed. Responses are cast to our
+// own loose shapes (kit's jsonParsed unions are gnarly; we access defensively).
+type GtfaConfig = {
+  transactionDetails: 'full' | 'signatures';
+  encoding?: 'json' | 'jsonParsed' | 'base64' | 'base58';
+  maxSupportedTransactionVersion?: number;
+  limit?: number;
+  filters?: { tokenAccounts?: 'none' | 'balanceChanged' | 'all' };
+};
+type WithTriton = {
+  getTransactionsForAddress(address: string, config: GtfaConfig): { send(): Promise<{ data?: GtfaEntry[] }> };
+};
+
+const base = createSolanaRpc(RPC_URL);
+const rpc = base as typeof base & WithTriton;
 
 // ---- Shapes we read (defensive: treat as intent, access fields carefully) ----
 export type ParsedInstruction = {
@@ -36,16 +42,16 @@ export type TokenBalance = {
 };
 
 export type TransactionResult = {
-  slot: number;
-  blockTime: number | null;
+  slot: bigint;
+  blockTime: bigint | null;
   version: number | 'legacy';
   transaction: { message: { accountKeys: AccountKey[]; instructions: ParsedInstruction[] }; signatures: string[] };
   meta: {
     err: unknown | null;
-    fee: number;
-    computeUnitsConsumed?: number;
-    preBalances: number[];
-    postBalances: number[];
+    fee: bigint;
+    computeUnitsConsumed?: bigint;
+    preBalances: bigint[];
+    postBalances: bigint[];
     preTokenBalances?: TokenBalance[];
     postTokenBalances?: TokenBalance[];
     innerInstructions?: { index: number; instructions: ParsedInstruction[] }[];
@@ -54,10 +60,9 @@ export type TransactionResult = {
 };
 
 export const getTransaction = (sig: string) =>
-  rpc<TransactionResult | null>('getTransaction', [
-    sig,
-    { maxSupportedTransactionVersion: 0, encoding: 'jsonParsed' },
-  ]);
+  rpc
+    .getTransaction(sig as Signature, { maxSupportedTransactionVersion: 0, encoding: 'jsonParsed' })
+    .send() as unknown as Promise<TransactionResult | null>;
 
 // ---- Account info (drives the account-page route) --------------------------
 export type AccountData =
@@ -67,23 +72,72 @@ export type AccountData =
 export type AccountValue = {
   owner: string;
   executable: boolean;
-  lamports: number;
-  rentEpoch?: number;
+  lamports: bigint;
+  rentEpoch?: bigint;
   space?: number;
   data: AccountData;
 };
 
 export const getAccountInfo = (addr: string) =>
-  rpc<{ value: AccountValue | null }>('getAccountInfo', [addr, { encoding: 'jsonParsed' }]);
+  rpc.getAccountInfo(addr as Address, { encoding: 'jsonParsed' }).send() as unknown as Promise<{
+    value: AccountValue | null;
+  }>;
 
 export type SignatureInfo = {
   signature: string;
-  slot: number;
+  slot: bigint;
   err: unknown | null;
-  blockTime: number | null;
-  memo: string | null;
-  confirmationStatus?: string;
+  blockTime: bigint | null;
 };
 
 export const getSignaturesForAddress = (addr: string, limit = 10) =>
-  rpc<SignatureInfo[]>('getSignaturesForAddress', [addr, { limit }]);
+  rpc.getSignaturesForAddress(addr as Address, { limit }).send() as unknown as Promise<SignatureInfo[]>;
+
+// A history entry — numbers coerced to `number` here so callers stay simple.
+export type HistoryIx = { programId: string; program?: string; parsed?: { type?: string } };
+export type HistoryEntry = {
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  err: unknown | null;
+  instructions: HistoryIx[]; // top-level; empty if we fell back to signatures-only
+};
+
+type GtfaEntry = {
+  slot: bigint;
+  blockTime: bigint | null;
+  meta: { err: unknown | null };
+  transaction: { signatures: string[]; message: { instructions: HistoryIx[] } };
+};
+
+// Triton's getTransactionsForAddress returns FULL txs in one call (so we can
+// summarize each), and `tokenAccounts: balanceChanged` also surfaces a wallet's
+// token transfers (which don't name the wallet pubkey). Falls back to the
+// standard getSignaturesForAddress (signatures only) on any non-Triton RPC.
+export async function getAccountTransactions(addr: string, limit = 10): Promise<HistoryEntry[]> {
+  try {
+    const r = await rpc.getTransactionsForAddress(addr, {
+      transactionDetails: 'full',
+      encoding: 'jsonParsed',
+      maxSupportedTransactionVersion: 0,
+      limit,
+      filters: { tokenAccounts: 'balanceChanged' },
+    }).send();
+    return (r?.data ?? []).map((e) => ({
+      signature: e.transaction?.signatures?.[0] ?? '',
+      slot: Number(e.slot),
+      blockTime: e.blockTime != null ? Number(e.blockTime) : null,
+      err: e.meta?.err ?? null,
+      instructions: e.transaction?.message?.instructions ?? [],
+    }));
+  } catch {
+    const sigs = await getSignaturesForAddress(addr, limit).catch(() => []);
+    return sigs.map((s) => ({
+      signature: s.signature,
+      slot: Number(s.slot),
+      blockTime: s.blockTime != null ? Number(s.blockTime) : null,
+      err: s.err,
+      instructions: [],
+    }));
+  }
+}

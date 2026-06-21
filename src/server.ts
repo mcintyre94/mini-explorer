@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import type { ServerResponse } from 'node:http';
-import { getTransaction, getAccountInfo, getSignaturesForAddress } from './rpc.ts';
+import { getTransaction, getAccountInfo, getAccountTransactions } from './rpc.ts';
 import { homeSkeleton, trendingPatch } from './home.ts';
 import { txSkeleton, balancesPatch, tokenChanges, tokenCellPatch } from './render.ts';
 import { searchTokens, getHoldings, searchByText, getTrending } from './jupiter.ts';
@@ -111,7 +111,7 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
     // Account doesn't currently exist, but it may still have history to show.
     openStream(res);
     res.write(notFoundSkeleton(addr));
-    const sigs = await slowly(slow, () => getSignaturesForAddress(addr, 10).catch(() => []));
+    const sigs = await slowly(slow, () => getAccountTransactions(addr, 10).catch(() => []));
     if (!res.writableEnded && !res.destroyed) res.write('\n' + historyPatch(sigs ?? []));
     return res.end();
   }
@@ -123,14 +123,14 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
 
   // Recent transactions for EVERY account type — getSignaturesForAddress works
   // on any address (kicked off in parallel with route-specific enrichment).
-  const sigsP = getSignaturesForAddress(addr, 10).catch(() => []);
+  const sigsP = getAccountTransactions(addr, 10).catch(() => []);
 
   // Which enrichment patches fire depends on what wave 1 found.
   if (route === 'wallet') {
     const holdings = await slowly(slow, () => getHoldings(addr));
     // Only non-zero holdings are displayed, so only resolve those mints.
     const rows = (holdings ? holdingRows(holdings) : []).filter((r) => r.uiAmount > 0);
-    const nativeSol = v.lamports / 1e9;
+    const nativeSol = Number(v.lamports) / 1e9;
     // Holdings render AFTER the search so they can be sorted by USD value.
     const info = await slowly(slow, () => searchTokens([SOL_MINT, ...rows.map((r) => r.mint)], { bypass }));
     if (alive()) res.write('\n' + holdingsPatch(rows, info));
@@ -200,7 +200,20 @@ async function serveStatic(res: ServerResponse, file: string) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+// Catch-all so a render/RPC error in one request can never crash the process.
+const server = http.createServer((req, res) => {
+  handle(req, res).catch((err) => {
+    console.error('request error:', err);
+    try {
+      if (!res.headersSent) res.writeHead(500);
+      if (!res.writableEnded) res.end();
+    } catch {
+      /* response already torn down */
+    }
+  });
+});
+
+async function handle(req: http.IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   const path = url.pathname;
 
@@ -225,7 +238,7 @@ const server = http.createServer(async (req, res) => {
   if (/^\/(tx|account)\/[^/]+$/.test(path)) return serveStatic(res, 'index.html');
 
   res.writeHead(404).end('Not found');
-});
+}
 
 server.listen(PORT, () => {
   console.log(`Solana Stream Explorer (MVP: tx + account, real data) → http://localhost:${PORT}`);

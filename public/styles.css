@@ -87,9 +87,9 @@ dl.meta {
   gap: 1px; background: var(--border);
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 0 0 24px;
 }
-dl.meta > div { background: var(--panel); padding: 10px 14px; }
+dl.meta > div { background: var(--panel); padding: 10px 14px; min-width: 0; }
 dl.meta dt { color: var(--muted); font-size: 12px; }
-dl.meta dd { margin: 2px 0 0; font-family: var(--mono); }
+dl.meta dd { margin: 2px 0 0; font-family: var(--mono); font-size: 13px; }
 
 h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 28px 0 10px; }
 
@@ -177,7 +177,9 @@ details.cpis summary { cursor: pointer; color: var(--muted); font-size: 12px; us
 .holdings li.more .holdings { margin-top: 8px; }
 
 .history { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
-.history li { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+.history li { display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 12px; }
+.hist-top { display: flex; gap: 10px; align-items: center; }
+.hist-sum { margin-top: 3px; font-size: 11px; }
 .history a { color: var(--accent); text-decoration: none; }
 .history a:hover { text-decoration: underline; }
 

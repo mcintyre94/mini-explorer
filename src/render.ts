@@ -5,8 +5,25 @@ import { decodeComputeBudget, priorityFeeLamports } from './decode.ts';
 import { html, raw, toHtml, marker, range, patch, join, type Html } from './html.ts';
 
 export const short = (a: string) => (a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
-const lamportsToSol = (l: number) => (l / 1e9).toFixed(9).replace(/\.?0+$/, '');
-const num = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+
+// Sensible adaptive formatting for token/SOL amounts. Big numbers don't need
+// fractional precision (and the truly huge get compact notation), but crypto
+// amounts are often tiny, so values < 1 keep their significant figures. Rounding
+// here means we don't need exact bigint formatting — the discarded digits are
+// exactly the ones float would corrupt anyway.
+export function humanAmount(n: number): string {
+  if (!Number.isFinite(n) || n === 0) return '0';
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return n.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 2 }); // 88T
+  if (abs >= 1e6) return n.toLocaleString('en-US', { maximumFractionDigits: 0 }); // 8,350,928,434
+  if (abs >= 1) return n.toLocaleString('en-US', { maximumFractionDigits: 4 }); // 1,089.5836
+  return n.toLocaleString('en-US', { maximumSignificantDigits: 6 }); // 0.00005, 0.006813
+}
+
+// lamports (bigint) → SOL. Number() may lose low digits for huge balances, but
+// those get rounded/compacted away by humanAmount, so the shown digits are exact.
+export const lamportsToSol = (l: bigint) => humanAmount(Number(l) / 1e9);
+
 const usd = (n: number) =>
   (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // Prices can be sub-cent; show enough significant figures for tiny ones.
@@ -129,7 +146,7 @@ function transferBody(type: string, info: Record<string, unknown>, ctx: Ctx): Ht
   } else if (info.amount != null) {
     const tk = ctx.acct.get(String(info.source ?? '')) ?? ctx.acct.get(String(info.destination ?? ''));
     if (tk) {
-      amount = html`<strong>${num(Number(info.amount) / 10 ** tk.decimals)}</strong>`;
+      amount = html`<strong>${humanAmount(Number(info.amount) / 10 ** tk.decimals)}</strong>`;
       mint = tk.mint;
     } else {
       amount = html`<span class="kv"><span class="k">amount</span> <span class="mono">${String(info.amount)}</span></span>`;
@@ -206,7 +223,7 @@ export function txSkeleton(sig: string, tx: TransactionResult): { html: string; 
   const meta = tx.meta;
   const ok = meta.err == null;
   const prio = priorityFeeLamports(tx);
-  const when = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : '—';
+  const when = tx.blockTime ? new Date(Number(tx.blockTime) * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : '—';
 
   // Each referenced mint gets a unique marker → resolved by the search wave.
   const mintRefs: TokenCellRef[] = [];
@@ -252,7 +269,7 @@ export function txSkeleton(sig: string, tx: TransactionResult): { html: string; 
     <div><dt>Fee payer</dt><dd class="mono">${m.accountKeys[0] ? addrLink(m.accountKeys[0].pubkey) : '—'}</dd></div>
     <div><dt>Fee</dt><dd class="mono">${lamportsToSol(meta.fee)} SOL</dd></div>
     <div><dt>Priority fee</dt><dd class="mono">${prio == null ? '—' : lamportsToSol(prio) + ' SOL'}</dd></div>
-    <div><dt>Compute units</dt><dd class="mono">${(meta.computeUnitsConsumed ?? 0).toLocaleString()} CU</dd></div>
+    <div><dt>Compute units</dt><dd class="mono">${(meta.computeUnitsConsumed ?? 0n).toLocaleString()} CU</dd></div>
     <div><dt>Version</dt><dd class="mono">${String(tx.version)}</dd></div>
   </dl>
 
@@ -305,11 +322,11 @@ export function balancesPatch(tx: TransactionResult, refs: TokenCellRef[]): stri
 
   const solRows: Html[] = [];
   for (let i = 0; i < meta.preBalances.length; i++) {
-    const d = (meta.postBalances[i] ?? 0) - (meta.preBalances[i] ?? 0);
-    if (d === 0) continue;
+    const d = (meta.postBalances[i] ?? 0n) - (meta.preBalances[i] ?? 0n);
+    if (d === 0n) continue;
     const key = m.accountKeys[i]?.pubkey ?? `#${i}`;
     solRows.push(html`<tr><td class="mono">${maybeAddr(key)}</td>
-      <td class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : ''}${lamportsToSol(d)} SOL</td></tr>`);
+      <td class="${d < 0n ? 'neg' : 'pos'}">${d > 0n ? '+' : ''}${lamportsToSol(d)} SOL</td></tr>`);
   }
 
   // Owner lookup, parallel to refs (tokenChanges walks pre then post balances).
@@ -326,7 +343,7 @@ export function balancesPatch(tx: TransactionResult, refs: TokenCellRef[]): stri
     const d = r.uiDelta ?? 0;
     return html`<tr>
       <td class="mono">${maybeAddr(owner)}</td>
-      <td class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : ''}${num(d)}</td>
+      <td class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : ''}${humanAmount(d)}</td>
       <td class="tok-cell">${range(r.name, 'resolving…')}</td>
     </tr>`;
   });

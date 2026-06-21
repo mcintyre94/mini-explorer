@@ -53,7 +53,7 @@ export function decodeComputeBudget(ix: ParsedInstruction): Decoded | null {
 }
 
 // Priority fee (lamports) = unitPrice (µLamports/CU) × unitLimit (CU) ÷ 1e6.
-export function priorityFeeLamports(tx: TransactionResult): number | null {
+export function priorityFeeLamports(tx: TransactionResult): bigint | null {
   let limit: bigint | null = null;
   let price: bigint | null = null;
   for (const ix of tx.transaction.message.instructions) {
@@ -68,5 +68,5 @@ export function priorityFeeLamports(tx: TransactionResult): number | null {
   }
   if (price == null) return null;
   const lim = limit ?? 200_000n; // default per-instruction CU limit if unset
-  return Number((price * lim) / 1_000_000n);
+  return (price * lim) / 1_000_000n;
 }
