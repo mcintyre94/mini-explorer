@@ -25,7 +25,7 @@ document.addEventListener('click', async (e) => {
 if (!Element.prototype.streamAppendHTMLUnsafe) {
   showFlagBanner();
 } else {
-  wireNav();
+  wireSearch();
   start();
 }
 
@@ -38,16 +38,61 @@ function showFlagBanner() {
     then a restart. (<code>Element.prototype.streamAppendHTMLUnsafe</code> is missing.)`;
 }
 
-function wireNav() {
+// Typeahead search: same streaming model, just piped into a dropdown instead of
+// #page-root. The server classifies + fetches + renders; the client only pipes,
+// debounces, and cancels stale queries. This is the one interactive island.
+function wireSearch() {
   const form = document.getElementById('nav');
   const q = document.getElementById('q');
+  const dd = document.getElementById('search-dd');
+  let abort, debounce;
+
+  const close = () => { dd.hidden = true; dd.replaceChildren(); };
+
+  async function run(query) {
+    abort?.abort(); // cancel the previous query's in-flight stream
+    if (query.trim().length < 2) { close(); return; }
+    const mine = (abort = new AbortController());
+    dd.hidden = false;
+    form.classList.add('searching');
+    try {
+      const res = await fetch('/search/stream?q=' + encodeURIComponent(query), { signal: mine.signal });
+      if (!res.ok || !res.body) return;
+      // streamHTMLUnsafe = the REPLACE variant: each query clears + refills.
+      // (Results are a flat anchor list — no markers — so innerHTML is a safe fallback.)
+      if (dd.streamHTMLUnsafe) {
+        await res.body.pipeThrough(new TextDecoderStream()).pipeTo(dd.streamHTMLUnsafe(), { signal: mine.signal });
+      } else {
+        const text = await res.text();
+        if (abort === mine) dd.innerHTML = text;
+      }
+    } catch { /* aborted or failed */ }
+    finally { if (abort === mine) form.classList.remove('searching'); }
+  }
+
+  q.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => run(q.value), 200); });
+  q.addEventListener('focus', () => { if (dd.childElementCount) dd.hidden = false; });
+
+  q.addEventListener('keydown', (e) => {
+    const items = [...dd.querySelectorAll('.search-result')];
+    if (e.key === 'Escape') return close();
+    if (!items.length || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+    e.preventDefault();
+    const cur = dd.querySelector('.search-result.active');
+    let i = items.indexOf(cur) + (e.key === 'ArrowDown' ? 1 : -1);
+    i = Math.max(0, Math.min(items.length - 1, i));
+    items.forEach((el) => el.classList.remove('active'));
+    items[i].classList.add('active');
+    items[i].scrollIntoView({ block: 'nearest' });
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const v = q.value.trim();
-    if (!v) return;
-    // Signatures are ~88 base58 chars; addresses ~32–44. Cheap heuristic.
-    location.href = (v.length >= 80 ? '/tx/' : '/account/') + encodeURIComponent(v);
+    const target = dd.querySelector('.search-result.active') || dd.querySelector('.search-result');
+    if (target) location.href = target.getAttribute('href');
   });
+
+  document.addEventListener('click', (e) => { if (!form.contains(e.target)) close(); });
 }
 
 async function start() {

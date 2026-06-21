@@ -32,6 +32,22 @@ export function tokenCell(info: TokenInfo, uiDelta?: number, compact = false): H
   return html`<span class="token resolved">${head}${verified}${price}${value}</span>`;
 }
 
+// A search-dropdown result row — one anchor (no nested links), links to the
+// mint's account page. Separate from tokenCell, which has its own inner anchor.
+export function tokenResultRow(info: TokenInfo): Html {
+  const iconChar = (info.symbol ?? '?')[0] ?? '?';
+  const icon = info.icon
+    ? html`<img class="token-img" src="${info.icon}" alt="" width="20" height="20" loading="lazy">`
+    : html`<span class="token-icon" aria-hidden="true">${iconChar}</span>`;
+  const verified = info.isVerified ? html`<span class="token-verified" title="Verified">✓</span>` : '';
+  const price = info.usdPrice != null ? html`<span class="usd">${usdPrice(info.usdPrice)}</span>` : '';
+  return html`<a class="search-result" href="/account/${info.id}">
+    ${icon}
+    <span class="sr-main"><strong>${info.symbol ?? '?'}</strong>${verified} <span class="muted">${info.name ?? ''}</span></span>
+    ${price}
+  </a>`;
+}
+
 // Terminal failure state: mint not indexed by Jupiter.
 export function unindexedCell(mint: string): Html {
   return html`<span class="token unindexed" title="Not indexed by Jupiter">

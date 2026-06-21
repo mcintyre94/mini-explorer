@@ -9,10 +9,11 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">◎ Solana Stream Explorer</a>
-    <form id="nav">
+    <form id="nav" autocomplete="off">
       <input id="q" name="q" autocomplete="off" spellcheck="false"
-             placeholder="Transaction signature or account address…">
+             placeholder="Search tokens, or paste an address / signature…">
       <button type="submit">Go</button>
+      <div id="search-dd" class="search-dd" hidden></div>
     </form>
   </header>
 

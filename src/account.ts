@@ -24,7 +24,7 @@ export function routeAccount(v: AccountValue): Route {
   return 'other';
 }
 
-const ROUTE_LABEL: Record<Route, string> = {
+export const ROUTE_LABEL: Record<Route, string> = {
   wallet: 'Wallet',
   mint: 'Mint',
   'token-account': 'Token Account',

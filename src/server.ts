@@ -5,7 +5,8 @@ import { dirname, join, extname } from 'node:path';
 import type { ServerResponse } from 'node:http';
 import { getTransaction, getAccountInfo, getSignaturesForAddress } from './rpc.ts';
 import { txSkeleton, balancesPatch, tokenChanges, tokenCellPatch } from './render.ts';
-import { searchTokens, getHoldings } from './jupiter.ts';
+import { searchTokens, getHoldings, searchByText } from './jupiter.ts';
+import { classifyQuery, accountResult, txCard, textResults } from './search.ts';
 import { esc } from './html.ts';
 import {
   routeAccount, accountSkeleton, notFoundSkeleton, holdingRows, holdingsPatch,
@@ -146,6 +147,32 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
 }
 
 // ----------------------------------------------------------------------------
+// SEARCH (typeahead) — same streaming model, piped into a dropdown client-side.
+// Classify the query server-side, fan out to the right source, stream a result.
+// ----------------------------------------------------------------------------
+async function streamSearch(res: ServerResponse, q: string) {
+  openStream(res);
+  try {
+    const kind = classifyQuery(q);
+    if (kind === 'account') {
+      // In parallel: the account type, and whether it's a Jupiter-indexed mint.
+      const [acct, tokens] = await Promise.all([
+        getAccountInfo(q).catch(() => null),
+        searchTokens([q]).catch(() => new Map()),
+      ]);
+      res.end(accountResult(q, acct?.value ?? null, tokens.get(q)));
+    } else if (kind === 'tx') {
+      const tx = await getTransaction(q).catch(() => null);
+      res.end(txCard(q, tx));
+    } else {
+      res.end(textResults(await searchByText(q)));
+    }
+  } catch {
+    res.end('<div class="search-empty muted">Search failed.</div>');
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Static files + routing
 // ----------------------------------------------------------------------------
 async function serveStatic(res: ServerResponse, file: string) {
@@ -165,6 +192,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/') return serveStatic(res, 'index.html');
   if (path === '/client.js') return serveStatic(res, 'client.js');
   if (path === '/styles.css') return serveStatic(res, 'styles.css');
+  if (path === '/search/stream') return streamSearch(res, url.searchParams.get('q') ?? '');
 
   // Gated: ignored entirely unless DEV_TOOLS is on.
   const bypass = DEV_TOOLS && url.searchParams.has('nocache');

@@ -55,6 +55,11 @@ Browser ──GET /tx/{sig}/stream──▶  Server (per-request orchestrator)
 - `GET /` — static canvas
 - `GET /tx/{sig}/stream` — chunked `text/html` transaction stream
 - `GET /account/{addr}/stream` — chunked `text/html` account stream
+- `GET /search/stream?q=` — typeahead results: query is classified server-side
+  by base58 byte length (32 = account, 64 = signature, else free-text token
+  search via Jupiter), streamed into a dropdown via the **replace** variant
+  (`streamHTMLUnsafe`). Note: a fetch per (debounced) keystroke — add per-IP
+  rate limiting before any public deploy.
 - `?slow=N` / `?nocache=1` on either — **dev knobs** (add N ms latency per
   external request / bypass the token cache for a cold load). Inert unless
   `DEV_TOOLS=1` is set (it is under `npm run dev`, not `npm start`), so they add

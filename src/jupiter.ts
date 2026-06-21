@@ -64,6 +64,26 @@ export async function searchTokens(
   return out;
 }
 
+// Search tokens by name/symbol (same endpoint, query is text not mints).
+// Returns results in Jupiter's relevance order and warms the token cache, so
+// clicking a result into its mint page is a warm load.
+export async function searchByText(query: string): Promise<TokenInfo[]> {
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const res = await fetch(`${BASE}/tokens/v2/search?query=${encodeURIComponent(q)}`, {
+      headers: { 'x-api-key': KEY ?? '' },
+    });
+    if (!res.ok) return [];
+    const arr = (await res.json()) as TokenInfo[];
+    const now = Date.now();
+    for (const t of arr) if (t?.id) tokenCache.set(t.id, { info: t, exp: now + TTL_MS });
+    return arr.filter((t) => t?.id);
+  } catch {
+    return [];
+  }
+}
+
 // ---- Wallet holdings: native SOL + per-mint token accounts -----------------
 export type TokenAccountHolding = {
   account: string;
