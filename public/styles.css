@@ -178,6 +178,7 @@ details.cpis summary { cursor: pointer; color: var(--muted); font-size: 12px; us
 
 .error { color: var(--neg); }
 
-/* Cells that arrive get a brief highlight so the out-of-order reveal is visible. */
-template + *, .token.resolved, .bal, .cpi-tree, .inv-row { animation: land .5s ease; }
+/* A token cell flashes briefly when its metadata actually resolves — the
+   out-of-order enrichment cue. Structural rows/tables render without a flash. */
+.token.resolved { animation: land .5s ease; border-radius: 4px; }
 @keyframes land { from { background-color: #14f19522; } to { background-color: transparent; } }
