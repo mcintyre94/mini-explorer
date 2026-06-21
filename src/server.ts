@@ -9,6 +9,7 @@ import { txSkeleton, balancesPatch, tokenChanges, tokenCellPatch } from './rende
 import { searchTokens, getHoldings, searchByText, getTrending } from './jupiter.ts';
 import { classifyQuery, accountResult, txCard, textResults } from './search.ts';
 import { esc } from './html.ts';
+import { allow, clientIp } from './ratelimit.ts';
 import {
   routeAccount, accountSkeleton, notFoundSkeleton, holdingRows, holdingsPatch,
   solUsdPatch, usdTotalPatch, historyPatch, mintMetaPatch, taTokenPatch, SOL_MINT,
@@ -220,6 +221,16 @@ async function handle(req: http.IncomingMessage, res: ServerResponse) {
   if (path === '/') return serveStatic(res, 'index.html');
   if (path === '/client.js') return serveStatic(res, 'client.js');
   if (path === '/styles.css') return serveStatic(res, 'styles.css');
+
+  // Rate-limit the dynamic endpoints (they fan out to RPC/Jupiter). Static files
+  // above are cheap and exempt. 429 with Retry-After when a bucket is empty.
+  if (path === '/home/stream' || path === '/search/stream' || /^\/(tx|account)\/[^/]+\/stream$/.test(path)) {
+    if (!allow(clientIp(req))) {
+      res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '2' });
+      return res.end('Too many requests — slow down a moment.');
+    }
+  }
+
   if (path === '/home/stream') return streamHome(res);
   if (path === '/search/stream') return streamSearch(res, url.searchParams.get('q') ?? '');
 

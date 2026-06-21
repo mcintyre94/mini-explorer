@@ -101,6 +101,7 @@ token cache for a cold load) are **inert unless `DEV_TOOLS=1`** — set by
 | `src/server.ts` | HTTP server, routing, per-request stream orchestration |
 | `src/html.ts` | `html` tagged template (escape-by-default) + marker/range/patch helpers |
 | `src/rpc.ts` | RPC client (`@solana/kit`) + extended `getTransactionsForAddress` (with fallback) |
+| `src/ratelimit.ts` | Per-IP + global token-bucket rate limiting for the dynamic endpoints |
 | `src/jupiter.ts` | Jupiter client (token search, holdings, trending) + token cache |
 | `src/decode.ts` | Native instruction decode (`@solana-program/compute-budget`) + priority fee |
 | `src/programs.ts` | Curated programId → label dictionary + native set |
@@ -118,5 +119,7 @@ token cache for a cold load) are **inert unless `DEV_TOOLS=1`** — set by
   Metadata / Anchor → Codama is a natural next step). Other not-yet-done:
   Token-2022 extensions, on-chain metadata for Jupiter-unindexed mints,
   historical USD at block time, SNS `.sol` names, NFT/DAS media.
-- The search and home endpoints hit RPC/Jupiter per request; add per-IP rate
-  limiting before any serious public deployment.
+- The dynamic endpoints fan out to RPC/Jupiter per request, so they're rate
+  limited (per-IP + a global backstop; see `src/ratelimit.ts`). It's in-memory,
+  so it's per-instance — fine for a single service, but it won't coordinate
+  across replicas if you scale out.
