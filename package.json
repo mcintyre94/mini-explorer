@@ -6,7 +6,10 @@
   "description": "Mini Solana explorer demoing Chrome declarative partial updates (out-of-order HTML streaming).",
   "scripts": {
     "dev": "DEV_TOOLS=1 node --env-file=.env --watch src/server.ts",
-    "start": "node --env-file=.env src/server.ts"
+    "start": "node src/server.ts"
+  },
+  "engines": {
+    "node": "24.x"
   },
   "dependencies": {
     "@solana-program/compute-budget": "^0.16.0",
