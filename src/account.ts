@@ -86,7 +86,9 @@ export function accountSkeleton(addr: string, v: AccountValue, route: Route): st
       <div><dt>Freeze authority</dt><dd class="mono">${info.freezeAuthority ? addrLink(String(info.freezeAuthority)) : none}</dd></div>
     </dl>
     <h3>Market &amp; metadata <span class="muted">(Jupiter)</span></h3>
-    <div class="mint-meta">${range('mint-meta', 'resolving market data…')}</div>`;
+    <div class="mint-meta">${range('mint-meta', 'resolving market data…')}</div>
+    <h3>Recent transactions <span class="muted">(referencing this mint — not all transfers)</span></h3>
+    <ul class="history">${range('history', 'loading…')}</ul>`;
   } else if (route === 'token-account') {
     const amt = (info.tokenAmount ?? {}) as Record<string, unknown>;
     body = html`

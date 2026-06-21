@@ -97,36 +97,16 @@ function wireSearch() {
 
 async function start() {
   const path = location.pathname;
-  const match = /^\/(tx|account)\/[^/]+$/.test(path);
-  if (!match) {
-    root.innerHTML = landing();
-    return;
-  }
+  let streamUrl;
+  if (path === '/') streamUrl = '/home/stream';
+  else if (/^\/(tx|account)\/[^/]+$/.test(path)) streamUrl = path + '/stream' + location.search;
+  else { root.innerHTML = '<p class="error">Not found.</p>'; return; }
   try {
-    const res = await fetch(path + '/stream' + location.search);
+    const res = await fetch(streamUrl);
     if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
-    // The whole reveal is this one line.
+    // The whole page is this one line. (The home stream stays open for live slots.)
     await res.body.pipeThrough(new TextDecoderStream()).pipeTo(root.streamAppendHTMLUnsafe());
   } catch (err) {
     root.innerHTML = `<p class="error">Stream failed: ${String(err)}</p>`;
   }
-}
-
-function landing() {
-  const tx = '35sRCZPkq2pwF1rEJ1MpXE9PD1Bxj8iUVRRfm4Dy38U9FCBnvnbuYyoNVo5oBC4gN8spaZ9Zf88NZWKuDeaZKYzL';
-  return `
-    <div class="landing">
-      <p>Each page renders its skeleton instantly from one fast read, then fills
-         in detail <em>out of order</em> as slower sources resolve — no client routing JS.</p>
-      <p>Live examples (real chain data):</p>
-      <ul>
-        <li><a href="/tx/${tx}">Transaction</a> — SOL/USDC/USDT Jupiter swap (native decode, balances, token cells)</li>
-        <li><a href="/account/5Wru1WjtbN1JXfeadYrRUGHdAMjMTUZD7YSFVrmTxqGw">Wallet</a> — SOL + holdings + history + portfolio USD</li>
-        <li><a href="/account/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">Mint (USDC)</a> — on-chain layout + Jupiter market data</li>
-        <li><a href="/account/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4">Program</a> — labeled program account</li>
-      </ul>
-      <p class="hint">Tip: append <code>?nocache=1</code> to force a cold load — the
-         token cache warms after the first view and flattens the reveal, so a cold
-         load is the dramatic one.</p>
-    </div>`;
 }

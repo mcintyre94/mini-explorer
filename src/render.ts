@@ -48,6 +48,33 @@ export function tokenResultRow(info: TokenInfo): Html {
   </a>`;
 }
 
+// Home "trending" row — like tokenResultRow but surfaces why it's trending:
+// 24h volume (activity) + 24h price change (momentum).
+const compactUsd = (n: number) =>
+  n >= 1e9 ? '$' + (n / 1e9).toFixed(1) + 'B'
+  : n >= 1e6 ? '$' + (n / 1e6).toFixed(1) + 'M'
+  : n >= 1e3 ? '$' + (n / 1e3).toFixed(1) + 'K'
+  : '$' + n.toFixed(0);
+
+export function trendingRow(info: TokenInfo): Html {
+  const iconChar = (info.symbol ?? '?')[0] ?? '?';
+  const icon = info.icon
+    ? html`<img class="token-img" src="${info.icon}" alt="" width="20" height="20" loading="lazy">`
+    : html`<span class="token-icon" aria-hidden="true">${iconChar}</span>`;
+  const verified = info.isVerified ? html`<span class="token-verified" title="Verified">✓</span>` : '';
+  const name = html`<span class="sr-main"><strong>${info.symbol ?? '?'}</strong>${verified} <span class="muted">${info.name ?? ''}</span></span>`;
+  const vol = (info.stats24h?.buyVolume ?? 0) + (info.stats24h?.sellVolume ?? 0);
+  const volCell = html`<span class="vol muted" title="24h volume">${vol > 0 ? compactUsd(vol) : '—'}</span>`;
+  const priceCell = html`<span class="usd">${info.usdPrice != null ? usdPrice(info.usdPrice) : '—'}</span>`;
+  const ch = info.stats24h?.priceChange;
+  const chR = ch != null ? ch.toFixed(2) : null;
+  const change = chR == null ? html`<span class="ch24 muted">—</span>`
+    : chR === '0.00' || chR === '-0.00' ? html`<span class="ch24 muted">0.00%</span>`
+    : html`<span class="ch24 ${ch! < 0 ? 'neg' : 'pos'}">${(ch! >= 0 ? '+' : '') + chR}%</span>`;
+  // Fixed column order — CSS grid aligns them across rows (see .trending-row).
+  return html`<a class="search-result trending-row" href="/account/${info.id}">${icon}${name}${volCell}${priceCell}${change}</a>`;
+}
+
 // Terminal failure state: mint not indexed by Jupiter.
 export function unindexedCell(mint: string): Html {
   return html`<span class="token unindexed" title="Not indexed by Jupiter">

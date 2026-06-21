@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import type { ServerResponse } from 'node:http';
 import { getTransaction, getAccountInfo, getSignaturesForAddress } from './rpc.ts';
+import { homeSkeleton, trendingPatch } from './home.ts';
 import { txSkeleton, balancesPatch, tokenChanges, tokenCellPatch } from './render.ts';
-import { searchTokens, getHoldings, searchByText } from './jupiter.ts';
+import { searchTokens, getHoldings, searchByText, getTrending } from './jupiter.ts';
 import { classifyQuery, accountResult, txCard, textResults } from './search.ts';
 import { esc } from './html.ts';
 import {
@@ -136,14 +137,30 @@ async function streamAccount(res: ServerResponse, addr: string, bypass = false, 
     if (alive()) res.write('\n' + solUsdPatch(nativeSol, info.get(SOL_MINT)));
     if (alive()) res.write('\n' + usdTotalPatch(nativeSol, rows, info));
   } else if (route === 'mint') {
-    const info = await slowly(slow, () => searchTokens([addr], { bypass }));
+    const [info, sigs] = await Promise.all([
+      slowly(slow, () => searchTokens([addr], { bypass })),
+      getSignaturesForAddress(addr, 10).catch(() => []),
+    ]);
     if (alive()) res.write('\n' + mintMetaPatch(addr, info.get(addr)));
+    if (alive()) res.write('\n' + historyPatch(sigs ?? []));
   } else if (route === 'token-account') {
     const mint = String((!Array.isArray(v.data) && v.data.parsed?.info?.mint) || '');
     const info = await slowly(slow, () => searchTokens(mint ? [mint] : [], { bypass }));
     if (alive()) res.write('\n' + taTokenPatch(mint, info.get(mint)));
   }
   // program / other: nothing async in MVP.
+  res.end();
+}
+
+// ----------------------------------------------------------------------------
+// HOME PAGE — skeleton, then trending tokens fill from Jupiter. Settle-and-close
+// (serverless-friendly, no shared state).
+// ----------------------------------------------------------------------------
+async function streamHome(res: ServerResponse) {
+  openStream(res);
+  res.write(homeSkeleton());
+  const trending = await getTrending().catch(() => []);
+  if (!res.writableEnded && !res.destroyed) res.write('\n' + trendingPatch(trending));
   res.end();
 }
 
@@ -193,6 +210,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/') return serveStatic(res, 'index.html');
   if (path === '/client.js') return serveStatic(res, 'client.js');
   if (path === '/styles.css') return serveStatic(res, 'styles.css');
+  if (path === '/home/stream') return streamHome(res);
   if (path === '/search/stream') return streamSearch(res, url.searchParams.get('q') ?? '');
 
   // Gated: ignored entirely unless DEV_TOOLS is on.

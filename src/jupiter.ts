@@ -19,6 +19,9 @@ export type TokenInfo = {
   mcap?: number;
   liquidity?: number;
   audit?: { mintAuthorityDisabled?: boolean; freezeAuthorityDisabled?: boolean; topHoldersPercentage?: number };
+  organicScore?: number;
+  organicScoreLabel?: string;
+  stats24h?: { priceChange?: number; buyVolume?: number; sellVolume?: number; numTraders?: number };
 };
 
 // Token-metadata cache, keyed by mint (small + high-hit). The cache warms the
@@ -68,6 +71,25 @@ export async function searchTokens(
     }
   }
   return out;
+}
+
+// Trending tokens (top organic score, 24h) for the home page. Short list cache
+// so it isn't a fresh Jupiter call per homepage hit; also warms the token cache.
+let trendingCache: { data: TokenInfo[]; exp: number } | null = null;
+export async function getTrending(limit = 12): Promise<TokenInfo[]> {
+  const now = Date.now();
+  if (trendingCache && trendingCache.exp > now) return trendingCache.data;
+  try {
+    const res = await fetch(`${BASE}/tokens/v2/toporganicscore/24h`, { headers: { 'x-api-key': KEY ?? '' } });
+    if (!res.ok) return trendingCache?.data ?? [];
+    const arr = (await res.json()) as TokenInfo[];
+    const data = arr.filter((t) => t?.id).slice(0, limit);
+    for (const t of data) tokenCache.set(t.id, { info: t, exp: now + TTL_MS });
+    trendingCache = { data, exp: now + 30_000 };
+    return data;
+  } catch {
+    return trendingCache?.data ?? [];
+  }
 }
 
 // Search tokens by name/symbol (same endpoint, query is text not mints).
